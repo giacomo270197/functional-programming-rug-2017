@@ -82,26 +82,6 @@ tokenize (x:xs)
   | elem x "*/-+()" = [x]:tokenize xs
   | isSpace x = tokenize xs
 
-parseS :: (String, [String]) -> (String, [String])
-parseS = parseS' . parseF
-
-parseS' :: (String, [String]) -> (String, [String])
-parseS' (accepted, tokens) = case tokens of
-                                 "*":xs -> parseS (accepted ++ "*", xs)
-                                 "/":xs -> parseS (accepted ++ "/", xs)
-                                 _ -> (accepted, tokens)
-
--- (accepted so far, raw tokens) -> (accepted after f, remaining tokens)
-parseF :: (String, [String]) -> (String, [String])
-parseF (_, []) = error "todo"
-parseF (accepted, tok:tokens)
-  | isAlpha (head tok) = (accepted ++ tok, tokens)
-  | isDigit (head tok) = (accepted ++ tok, tokens)
-  | otherwise          = error "todo2"
-
-parser :: String -> (String,[String])
-parser str = parseS ("", tokenize str)
-
 ------------------------------
 
 -- no more maybe?
@@ -179,4 +159,4 @@ toPos (a:-:b) = a:+:(negate b)
 toPos (a:/:b) = a:*:(1:/:b)
 
 simplify :: Expr -> Expr
-simplify 
+simplify = undefined -- todo for bonus
