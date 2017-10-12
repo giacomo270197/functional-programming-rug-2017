@@ -79,46 +79,57 @@ tokenize (x:xs)
                 in (x:tok):tokenize rest
   | isDigit x = let (rest, tok) = takeWhileTulple isNumber xs
                  in (x:tok):tokenize rest
-  | elem x "*/-+" = [x]:tokenize xs
+  | elem x "*/-+()" = [x]:tokenize xs
   | isSpace x = tokenize xs
 
--- parseS :: (String, [String]) -> (String, [String])
--- parseS = parseS' . parseF
--- 
--- parseS' :: (String, [String]) -> (String, [String])
--- parseS' (accepted, tokens) = case tokens of
---                                  "*":xs -> parseS (accepted ++ "*", xs)
---                                  "/":xs -> parseS (accepted ++ "/", xs)
---                                  _ -> (accepted, tokens)
--- 
--- -- (accepted so far, raw tokens) -> (accepted after f, remaining tokens)
--- parseF :: (String, [String]) -> (String, [String])
--- parseF (_, []) = error "todo"
--- parseF (accepted, tok:tokens)
---   | isAlpha (head tok) = (accepted ++ tok, tokens)
---   | isDigit (head tok) = (accepted ++ tok, tokens)
---   | otherwise          = error "todo2"
--- 
--- parser :: String -> (String,[String])
--- parser str = parseS ("", tokenize str)
+parseS :: (String, [String]) -> (String, [String])
+parseS = parseS' . parseF
+
+parseS' :: (String, [String]) -> (String, [String])
+parseS' (accepted, tokens) = case tokens of
+                                 "*":xs -> parseS (accepted ++ "*", xs)
+                                 "/":xs -> parseS (accepted ++ "/", xs)
+                                 _ -> (accepted, tokens)
+
+-- (accepted so far, raw tokens) -> (accepted after f, remaining tokens)
+parseF :: (String, [String]) -> (String, [String])
+parseF (_, []) = error "todo"
+parseF (accepted, tok:tokens)
+  | isAlpha (head tok) = (accepted ++ tok, tokens)
+  | isDigit (head tok) = (accepted ++ tok, tokens)
+  | otherwise          = error "todo2"
+
+parser :: String -> (String,[String])
+parser str = parseS ("", tokenize str)
 
 ------------------------------
 
+-- no more maybe?
 type Parse x = [String] -> Maybe ([String], x)
+type Parse2 x = [String] -> ([String], x)
 data Status = Succes | Failure
 
-val :: Parse Expr
+-- remove Maybe
+val :: Parse2 Expr
+val [] = error "Parse error"
 val (x:xs)
-  | all isAlpha x = Just (xs, Var x)
-  | all isNumber x = Just (xs, Val $ read x)
-  | otherwise = Nothing
+  | all isAlpha x = (xs, Var x)
+  | all isNumber x = (xs, Val $ read x)
+  | x == "(" = let (newInput, out) = expr xs
+                in case newInput of
+                     (")":rest) -> (rest, out)
+                     _ -> error "Syntax error"
+  | otherwise = error "Syntax error"
 
+-- | top level parser
+expr :: [String] -> ([String], Expr)
 expr input =
-  let Just (input1, v) = val input
+  let (input1, v) = val input
       (input2, f) = maybe (input1, id) id $ factor input1
       (input3, t) = maybe (input2, id) id $ term input2
-  in return . t . f $ v
+   in (input3, t . f $ v)
 
+-- | 
 choice :: [Parse a] -> Parse a
 choice actions x = foldr' (<|>) Nothing . map (\f -> f x) $ actions
 
@@ -133,7 +144,7 @@ term input = Just $ foldr (.) id <$> many f input
     f :: Parse (Expr -> Expr)
     f input = do
       (input2, sign) <- termSign input
-      (input3, v) <- val input2
+      (input3, v) <- Just $ val input2
       (input4, b) <- factor input3
       return (input4, (`sign` (b v)))
 
@@ -150,7 +161,7 @@ factor input = Just $ foldr (.) id <$> many f input
     f :: Parse (Expr -> Expr)
     f input = do
       (input2, sign) <- factorSign input
-      (input3, b) <- val input2
+      (input3, b) <- Just $ val input2
       return (input3, (`sign` b))
 
 factorSign :: Parse (Expr -> Expr -> Expr)
@@ -160,42 +171,12 @@ factorSign (x:xs)
   | x == "/" = Just (xs,(:/:))
   | x == "%" = Just (xs,(:%:))
   | otherwise = Nothing
-    
--------------------
-  -- type ParseS = State (Expr, [String])
-  -- 
-  -- valS :: ParseS Status
-  -- valS = state (\(res, input) -> (res, news))
-  --   x <- gets $ head . snd
-  --   case f x of
-  --     Just x = 
-  --     where
-  --       f x
-  --         | all isAlpha x = Just $ Var x
-  --         | all isNumber x = Just $ Val $ read x
-  --         | otherwise = Nothing
-  -- 
-  -- exprS :: ParseS ()
-  -- exprS = sum
-  -- 
-  -- termS :: ParseS ()
-  -- termS = do
-  --   a <- factor
-  --   sign <- termSign
-  --   b <- factor
-  --   return $ sign a b
-  -- 
-  -- factorS :: ParseS ()
-  -- factorS = do
-  --   a <- val
-  --   sign <- factorSign
-  --   b <- val
-  --   return $ sign
-  -- 
-  -- valS :: ParseS Expr
-  -- valS xs
-  --   | all isAlpha xs = Var xs
-  --   | all isDigit xs = Val $ read xs
 
+------
 
+toPos :: Expr -> Expr
+toPos (a:-:b) = a:+:(negate b)
+toPos (a:/:b) = a:*:(1:/:b)
 
+simplify :: Expr -> Expr
+simplify 
