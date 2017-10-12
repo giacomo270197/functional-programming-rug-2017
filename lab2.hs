@@ -86,7 +86,7 @@ tokenize (x:xs)
 
 -- no more maybe?
 type Parse x = [String] -> Maybe ([String], x)
-type Parse2  = [String] -> ([String], x)
+type Parse2 x = [String] -> ([String], x)
 
 val :: Parse2 Expr
 val [] = error "Parse error"
@@ -153,9 +153,9 @@ factorSign (x:xs)
 
 ------ | simplify functions
 
-toPos :: Expr -> Expr
-toPos (a:-:b) = a:+:(negate b)
-toPos (a:/:b) = a:*:(1:/:b)
+-- toPos :: Expr -> Expr
+-- toPos (a:-:b) = a:+:(negate b)
+-- toPos (a:/:b) = a:*:(1:/:b)
 
 simplify :: Expr -> Expr
 simplify = undefined -- todo for bonus
