@@ -86,10 +86,8 @@ tokenize (x:xs)
 
 -- no more maybe?
 type Parse x = [String] -> Maybe ([String], x)
-type Parse2 x = [String] -> ([String], x)
-data Status = Succes | Failure
+type Parse2  = [String] -> ([String], x)
 
--- remove Maybe
 val :: Parse2 Expr
 val [] = error "Parse error"
 val (x:xs)
@@ -109,10 +107,11 @@ expr input =
       (input3, t) = maybe (input2, id) id $ term input2
    in (input3, t . f $ v)
 
--- | 
+-- | parse one of the parsers in the first argument, prefers the left ones
 choice :: [Parse a] -> Parse a
 choice actions x = foldr' (<|>) Nothing . map (\f -> f x) $ actions
 
+-- | parse 0 or more times the parser in the first argument
 many :: Parse a -> [String] -> ([String], [a])-- parse [a] -- [String] -> [a]
 many f input = case f input of
                  Just (newInput, res) -> fmap (res:) $ many f newInput
@@ -152,7 +151,7 @@ factorSign (x:xs)
   | x == "%" = Just (xs,(:%:))
   | otherwise = Nothing
 
-------
+------ | simplify functions
 
 toPos :: Expr -> Expr
 toPos (a:-:b) = a:+:(negate b)
