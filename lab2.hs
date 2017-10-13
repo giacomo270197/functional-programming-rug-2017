@@ -67,19 +67,11 @@ valuations ((name, domain):xs) =
 -- genVal x = filter (\[(_, a),(_,b),(_,c)] -> a <= b) x
 --   where a = [("a", [1..x]),("b", [1..x]),("c", [1..x])]
 
-takeWhileTulple :: (a -> Bool) -> [a] -> ([a],[a])
-takeWhileTulple f [] = ([],[])
-takeWhileTulple f (x:xs)
-  | f x = (x:) <$> takeWhileTulple f xs
-  | otherwise = (x:xs,[])
-
 tokenize :: String -> [String]
 tokenize [] = []
 tokenize (x:xs)
-  | isAlpha x = let (rest, tok) = takeWhileTulple isAlpha xs
-                in (x:tok):tokenize rest
-  | isDigit x = let (rest, tok) = takeWhileTulple isNumber xs
-                 in (x:tok):tokenize rest
+  | isAlpha x = (x:takeWhile isAlpha xs):tokenize (dropWhile isAlpha xs)
+  | isDigit x = (x:takeWhile isDigit xs):tokenize (dropWhile isDigit xs)
   | elem x "*/-+()" = [x]:tokenize xs
   | isSpace x = tokenize xs
 
