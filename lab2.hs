@@ -1,10 +1,8 @@
 {-# LANGUAGE DeriveFunctor #-}
 
-import Data.List
-import Data.Char
-import Control.Applicative hiding (many, some)
-import Data.Foldable
-import Data.Bifunctor
+import Data.List (sort, nub)
+import Data.Char (isAlpha, isDigit, isSpace)
+import Control.Applicative ((<|>))
 
 type Name   = String
 type Domain = [Integer]
@@ -19,19 +17,26 @@ data Expr = Val Integer
 instance Show Expr where
   show (Val x) = show x
   show (Var x) = x
-  show (a :+: b) = inbetween a b "+"
-  show (a :-: b) = inbetween a b "-"
-  show (a :*: b) = inbetween a b "*"
-  show (a :/: b) = inbetween a b "/"
-  show (a :%: b) = inbetween a b "%"
-  
-main = return ()
+  show (a :+: b) = show a ++ "+" ++ show b
+  show (a :-: b) = show a ++ "-" ++ show b
+  show (a :*: b) = showf a ++ "*" ++ showf b
+  show (a :/: b) = showf a ++ "/" ++ showf b
+  show (a :%: b) = showf a ++ "%" ++ showf b
+
+showf :: Expr -> String
+showf a
+  | isTerm a = embrace $ show a
+  | otherwise = show a
+
+isTerm :: Expr -> Bool
+isTerm (_ :+: _) = True
+isTerm (_ :-: _) = True
+isTerm _ = False
 
 embrace :: String -> String
 embrace x = "(" ++ x ++ ")"
 
-inbetween :: Show a => a -> a -> String -> String
-inbetween a b x = embrace $ show a ++ x ++ show b
+main = return ()
 
 vars = nub . sort . f
   where
@@ -83,7 +88,7 @@ val :: Parse Expr
 val [] = error "Parse error"
 val (x:xs)
   | all isAlpha x = Just (xs, Var x)
-  | all isNumber x = Just (xs, Val $ read x)
+  | all isDigit x = Just (xs, Val $ read x)
   | x == "(" = let (newInput, out) = expr xs
                 in case newInput of
                      (")":rest) -> Just (rest, out)
@@ -100,7 +105,7 @@ expr input =
 
 -- | parse one of the parsers in the first argument, prefers the left ones
 choice :: [Parse a] -> Parse a
-choice actions x = foldr' (<|>) Nothing . map (\f -> f x) $ actions
+choice actions x = foldr (<|>) Nothing . map (\f -> f x) $ actions
 
 -- | parse 0 or more times the parser in the first argument
 many :: Parse a -> [String] -> ([String], [a])-- parse [a] -- [String] -> [a]
@@ -109,7 +114,7 @@ many f input = case f input of
                  Nothing -> (input, [])
 
 term :: Parse (Expr -> Expr)
-term input = Just $ foldr' (.) id <$> many f input
+term input = Just $ foldr (.) id <$> many f input
   where
     f :: Parse (Expr -> Expr)
     f input = do
