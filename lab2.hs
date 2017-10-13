@@ -25,6 +25,7 @@ instance Show Expr where
   show (a :/: b) = inbetween a b "/"
   show (a :%: b) = inbetween a b "%"
   
+main = return ()
 
 embrace :: String -> String
 embrace x = "(" ++ x ++ ")"
@@ -84,25 +85,23 @@ tokenize (x:xs)
 
 ------------------------------
 
--- no more maybe?
 type Parse x = [String] -> Maybe ([String], x)
-type Parse2 x = [String] -> ([String], x)
 
-val :: Parse2 Expr
+val :: Parse Expr
 val [] = error "Parse error"
 val (x:xs)
-  | all isAlpha x = (xs, Var x)
-  | all isNumber x = (xs, Val $ read x)
+  | all isAlpha x = Just (xs, Var x)
+  | all isNumber x = Just (xs, Val $ read x)
   | x == "(" = let (newInput, out) = expr xs
                 in case newInput of
-                     (")":rest) -> (rest, out)
+                     (")":rest) -> Just (rest, out)
                      _ -> error "Syntax error"
   | otherwise = error "Syntax error"
 
 -- | top level parser
 expr :: [String] -> ([String], Expr)
 expr input =
-  let (input1, v) = val input
+  let (input1, v) = maybe (error "") id $ val input
       (input2, f) = maybe (input1, id) id $ factor input1
       (input3, t) = maybe (input2, id) id $ term input2
    in (input3, t . f $ v)
@@ -114,16 +113,16 @@ choice actions x = foldr' (<|>) Nothing . map (\f -> f x) $ actions
 -- | parse 0 or more times the parser in the first argument
 many :: Parse a -> [String] -> ([String], [a])-- parse [a] -- [String] -> [a]
 many f input = case f input of
-                 Just (newInput, res) -> fmap (res:) $ many f newInput
+                 Just (newInput, res) -> fmap (++ [res]) $ many f newInput
                  Nothing -> (input, [])
 
 term :: Parse (Expr -> Expr)
-term input = Just $ foldr (.) id <$> many f input
+term input = Just $ foldr' (.) id <$> many f input
   where
     f :: Parse (Expr -> Expr)
     f input = do
       (input2, sign) <- termSign input
-      (input3, v) <- Just $ val input2
+      (input3, v) <- val input2
       (input4, b) <- factor input3
       return (input4, (`sign` (b v)))
 
@@ -140,7 +139,7 @@ factor input = Just $ foldr (.) id <$> many f input
     f :: Parse (Expr -> Expr)
     f input = do
       (input2, sign) <- factorSign input
-      (input3, b) <- Just $ val input2
+      (input3, b) <- val input2
       return (input3, (`sign` b))
 
 factorSign :: Parse (Expr -> Expr -> Expr)
