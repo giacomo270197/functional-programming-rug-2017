@@ -14,6 +14,7 @@ data Expr = Val Integer
           | Expr :/: Expr
           | Expr :%: Expr
 
+-- | exercise 1
 instance Show Expr where
   show (Val x) = show x
   show (Var x) = x
@@ -23,6 +24,7 @@ instance Show Expr where
   show (a :/: b) = showf a ++ "/" ++ showf b
   show (a :%: b) = showf a ++ "%" ++ showf b
 
+-- | show function while in a factor
 showf :: Expr -> String
 showf a
   | isTerm a = embrace $ show a
@@ -36,8 +38,8 @@ isTerm _ = False
 embrace :: String -> String
 embrace x = "(" ++ x ++ ")"
 
-main = return ()
-
+-- | exercise 2
+vars :: Expr -> [String]
 vars = nub . sort . f
   where
     f :: Expr -> [String]
@@ -49,6 +51,7 @@ vars = nub . sort . f
     f (a :/: b) = vars a ++ vars b
     f (a :%: b) = vars a ++ vars b
 
+-- | exercise 3
 type Valuation = [(Name, Integer)]
 
 evalExpr :: Expr -> Valuation -> Integer
@@ -62,15 +65,21 @@ evalExpr (a :*: b) v = evalExpr a v * evalExpr b v
 evalExpr (a :/: b) v = evalExpr a v `div` evalExpr b v
 evalExpr (a :%: b) v = evalExpr a v `mod` evalExpr b v
 
+-- | exercise 4? (there is no 4 in the pdf)
 valuations :: [(Name, Domain)] -> [Valuation]
 valuations [(name, domain)] = [[(name, x)] | x <- domain]
 valuations ((name, domain):xs) =
   [(name,x):xs | x<-domain, xs<-valuations xs ]
 
--- [("a", [1..10]),("b", [1..10]),("c", [1..10])]
--- genVal :: Integer -> [(Name, Domain)]
--- genVal x = filter (\[(_, a),(_,b),(_,c)] -> a <= b) x
---   where a = [("a", [1..x]),("b", [1..x]),("c", [1..x])]
+pytriples :: Integer -> [[(String, Integer)]]
+pytriples = filter (\x -> evalParse "a*a+b*b-c*c" x == 0) . filteredVal
+  where 
+    filteredVal = filter (\[a,b,c] -> snd a <= snd b) . allVal
+    allVal n = valuations [("a",[1..n]),("b",[1..n]),("c",[1..n])]
+
+-- | exercise 5
+parse = expr . tokenize
+evalParse = evalExpr . snd . parse
 
 tokenize :: String -> [String]
 tokenize [] = []
@@ -79,8 +88,7 @@ tokenize (x:xs)
   | isDigit x = (x:takeWhile isDigit xs):tokenize (dropWhile isDigit xs)
   | elem x "*/-+()" = [x]:tokenize xs
   | isSpace x = tokenize xs
-
-------------------------------
+  | otherwise = error $ "unknown char '" ++ [x] ++ "'"
 
 type Parse x = [String] -> Maybe ([String], x)
 
@@ -110,7 +118,7 @@ choice actions x = foldr (<|>) Nothing . map (\f -> f x) $ actions
 -- | parse 0 or more times the parser in the first argument
 many :: Parse a -> [String] -> ([String], [a])-- parse [a] -- [String] -> [a]
 many f input = case f input of
-                 Just (newInput, res) -> fmap (++ [res]) $ many f newInput
+                 Just (newInput, res) -> map (++ [res]) $ many f newInput
                  Nothing -> (input, [])
 
 term :: Parse (Expr -> Expr)
