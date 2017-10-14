@@ -4,6 +4,7 @@ import Data.List (sort, nub)
 import Data.Char (isAlpha, isDigit, isSpace)
 import Control.Applicative ((<|>))
 
+-- | data types and types as in the pdf
 type Name   = String
 type Domain = [Integer]
 data Expr = Val Integer
@@ -25,6 +26,7 @@ instance Show Expr where
   show (a :%: b) = showf a ++ "%" ++ showf b
 
 -- | show function while in a factor
+--   this only has print braces is there is a term
 showf :: Expr -> String
 showf a
   | isTerm a = embrace $ show a
@@ -74,6 +76,7 @@ valuations ((name, domain):xs) =
 pytriples :: Integer -> [[(String, Integer)]]
 pytriples = filter (\x -> evalParse "a*a+b*b-c*c" x == 0) . filteredVal
   where 
+    -- all valuations where: a <= b <= n, c <= n
     filteredVal = filter (\[a,b,c] -> snd a <= snd b) . allVal
     allVal n = valuations [("a",[1..n]),("b",[1..n]),("c",[1..n])]
 
@@ -90,10 +93,16 @@ tokenize (x:xs)
   | isSpace x = tokenize xs
   | otherwise = error $ "unknown char '" ++ [x] ++ "'"
 
-type Parse x = [String] -> Maybe ([String], x)
+-- | type for a parsing function
+--   x is the type is returns
+--   parsers take a list of strings (tokens)
+--   and return 'Just (non parsed tokens, result)'
+--   or Nothing if it could not parse anything
+type Parser x = [String] -> Maybe ([String], x)
 
-val :: Parse Expr
-val [] = error "Parse error"
+-- | parser for a 
+val :: Parser Expr
+val [] = error "Parsen error"
 val (x:xs)
   | all isAlpha x = Just (xs, Var x)
   | all isDigit x = Just (xs, Val $ read x)
@@ -112,48 +121,50 @@ expr input =
    in (input3, t . f $ v)
 
 -- | parse one of the parsers in the first argument, prefers the left ones
-choice :: [Parse a] -> Parse a
+choice :: [Parser a] -> Parser a
 choice actions x = foldr (<|>) Nothing . map (\f -> f x) $ actions
 
 -- | parse 0 or more times the parser in the first argument
-many :: Parse a -> [String] -> ([String], [a])-- parse [a] -- [String] -> [a]
+many :: Parser a -> [String] -> ([String], [a])
 many f input = case f input of
-                 Just (newInput, res) -> map (++ [res]) $ many f newInput
+                 Just (newInput, res) -> fmap (++ [res]) $ many f newInput
                  Nothing -> (input, [])
 
-term :: Parse (Expr -> Expr)
+-- | parse a term
+term :: Parser (Expr -> Expr)
 term input = Just $ foldr (.) id <$> many f input
   where
-    f :: Parse (Expr -> Expr)
+    f :: Parser (Expr -> Expr)
     f input = do
       (input2, sign) <- termSign input
       (input3, v) <- val input2
       (input4, b) <- factor input3
       return (input4, (`sign` (b v)))
 
-termSign :: Parse (Expr -> Expr -> Expr)
-termSign [] = Nothing
-termSign (x:xs)
-  | x == "+" = Just (xs,(:+:))
-  | x == "-" = Just (xs,(:-:))
-  | otherwise = Nothing
+    termSign :: Parser (Expr -> Expr -> Expr)
+    termSign [] = Nothing
+    termSign (x:xs)
+      | x == "+" = Just (xs,(:+:))
+      | x == "-" = Just (xs,(:-:))
+      | otherwise = Nothing
 
-factor :: Parse (Expr -> Expr)
+-- | parse a factor
+factor :: Parser (Expr -> Expr)
 factor input = Just $ foldr (.) id <$> many f input 
   where 
-    f :: Parse (Expr -> Expr)
+    f :: Parser (Expr -> Expr)
     f input = do
       (input2, sign) <- factorSign input
       (input3, b) <- val input2
       return (input3, (`sign` b))
 
-factorSign :: Parse (Expr -> Expr -> Expr)
-factorSign [] = Nothing
-factorSign (x:xs)
-  | x == "*" = Just (xs,(:*:))
-  | x == "/" = Just (xs,(:/:))
-  | x == "%" = Just (xs,(:%:))
-  | otherwise = Nothing
+    factorSign :: Parser (Expr -> Expr -> Expr)
+    factorSign [] = Nothing
+    factorSign (x:xs)
+      | x == "*" = Just (xs,(:*:))
+      | x == "/" = Just (xs,(:/:))
+      | x == "%" = Just (xs,(:%:))
+      | otherwise = Nothing
 
 ------ | simplify functions
 
